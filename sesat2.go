@@ -98,7 +98,12 @@ func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 type Builder struct {
 	mu sync.Mutex
 
-	timeout time.Duration
+	timeout               time.Duration
+	dialTimeout           time.Duration
+	keepAlive             time.Duration
+	idleConnTimeout       time.Duration
+	responseHeaderTimeout time.Duration
+	tlsHandshakeTimeout   time.Duration
 
 	defaultHeaders http.Header
 
@@ -126,6 +131,41 @@ func (b *Builder) WithTimeout(d time.Duration) *Builder {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.timeout = d
+	return b
+}
+
+func (b *Builder) WithDialTimeout(d time.Duration) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.dialTimeout = d
+	return b
+}
+
+func (b *Builder) WithKeepAlive(d time.Duration) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.keepAlive = d
+	return b
+}
+
+func (b *Builder) WithIdleConnTimeout(d time.Duration) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.idleConnTimeout = d
+	return b
+}
+
+func (b *Builder) WithResponseHeaderTimeout(d time.Duration) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.responseHeaderTimeout = d
+	return b
+}
+
+func (b *Builder) WithTLSHandshakeTimeout(d time.Duration) *Builder {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.tlsHandshakeTimeout = d
 	return b
 }
 
@@ -227,6 +267,20 @@ func (b *Builder) Build() (*http.Client, error) {
 		base = base.Clone()
 	}
 
+	dialTimeout := orDefault(b.dialTimeout, 30*time.Second)
+	keepAlive := orDefault(b.keepAlive, 30*time.Second)
+	idleConnTimeout := orDefault(b.idleConnTimeout, 90*time.Second)
+	responseHeaderTimeout := orDefault(b.responseHeaderTimeout, 30*time.Second)
+	tlsHandshakeTimeout := orDefault(b.tlsHandshakeTimeout, 10*time.Second)
+
+	base.DialContext = (&net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: keepAlive,
+	}).DialContext
+	base.IdleConnTimeout = idleConnTimeout
+	base.ResponseHeaderTimeout = responseHeaderTimeout
+	base.TLSHandshakeTimeout = tlsHandshakeTimeout
+
 	base.Proxy = nil
 
 	var rt http.RoundTripper = base
@@ -257,6 +311,13 @@ func (b *Builder) Build() (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+func orDefault(d, fallback time.Duration) time.Duration {
+	if d <= 0 {
+		return fallback
+	}
+	return d
 }
 
 type secureTransport struct {
