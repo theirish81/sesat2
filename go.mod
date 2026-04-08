@@ -1,4 +1,4 @@
-module githb.com/theirish81/sesat2
+module github.com/theirish81/sesat2
 
 go 1.25
 
