@@ -87,7 +87,7 @@ func ipToNet(ip net.IP) *net.IPNet {
 	return &net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}
 }
 
-type Middleware func(http.RoundTripper) http.RoundTripper
+type Interceptor func(req *http.Request, next func(*http.Request) (*http.Response, error)) (*http.Response, error)
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
@@ -114,7 +114,7 @@ type Builder struct {
 	baseTransport *http.Transport
 	resolver      *net.Resolver
 
-	middlewares []Middleware
+	interceptors []Interceptor
 }
 
 func New() *Builder {
@@ -243,10 +243,10 @@ func (b *Builder) WithResolver(r *net.Resolver) *Builder {
 	return b
 }
 
-func (b *Builder) WithMiddleware(m Middleware) *Builder {
+func (b *Builder) WithInterceptor(i Interceptor) *Builder {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.middlewares = append(b.middlewares, m)
+	b.interceptors = append(b.interceptors, i)
 	return b
 }
 
@@ -283,10 +283,19 @@ func (b *Builder) Build() (*http.Client, error) {
 
 	base.Proxy = nil
 
-	var rt http.RoundTripper = base
-	for i := len(b.middlewares) - 1; i >= 0; i-- {
-		rt = b.middlewares[i](rt)
-	}
+	interceptors := append([]Interceptor(nil), b.interceptors...)
+	var rt http.RoundTripper = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		var invoke func(i int, req *http.Request) (*http.Response, error)
+		invoke = func(i int, req *http.Request) (*http.Response, error) {
+			if i == len(interceptors) {
+				return base.RoundTrip(req)
+			}
+			return interceptors[i](req, func(r *http.Request) (*http.Response, error) {
+				return invoke(i+1, r)
+			})
+		}
+		return invoke(0, req)
+	})
 
 	rt = &secureTransport{
 		next:            rt,

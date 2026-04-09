@@ -108,11 +108,8 @@ func TestTransportWrapping(t *testing.T) {
 		defer ts.Close()
 		client, err := New().WithHeaders(http.Header{
 			"X-Foobar": []string{"foobar"},
-		}).WithMiddleware(func(next http.RoundTripper) http.RoundTripper {
-			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-				return next.RoundTrip(req)
-
-			})
+		}).WithInterceptor(func(req *http.Request, next func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+			return next(req)
 		}).Build()
 		assert.NoError(t, err)
 		_, err = client.Get(ts.URL)
@@ -127,11 +124,9 @@ func TestTransportWrapping(t *testing.T) {
 		defer ts.Close()
 		client, err := New().WithHeaders(http.Header{
 			"X-Foobar": []string{"foobar"},
-		}).WithMiddleware(func(next http.RoundTripper) http.RoundTripper {
-			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-				req.Header.Set("X-Baloni", "baloni")
-				return next.RoundTrip(req)
-			})
+		}).WithInterceptor(func(req *http.Request, next func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+			req.Header.Set("X-Baloni", "baloni")
+			return next(req)
 		}).Build()
 		assert.NoError(t, err)
 		_, err = client.Get(ts.URL)
