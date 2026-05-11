@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -156,4 +157,21 @@ type extraRoundTripper struct {
 func (e extraRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("X-Baloni", "baloni")
 	return e.rt.RoundTrip(r)
+}
+
+func TestTimeouts(t *testing.T) {
+	t.Run("default timeouts", func(t *testing.T) {
+		client, err := New().Build()
+		assert.NoError(t, err)
+		assert.Equal(t, 1*time.Minute, client.Timeout)
+	})
+
+	t.Run("custom timeouts", func(t *testing.T) {
+		customTimeout := 45 * time.Second
+		client, err := New().
+			WithTimeout(customTimeout).
+			Build()
+		assert.NoError(t, err)
+		assert.Equal(t, customTimeout, client.Timeout)
+	})
 }

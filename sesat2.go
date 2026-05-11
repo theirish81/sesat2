@@ -272,6 +272,7 @@ func (b *Builder) Build() (*http.Client, error) {
 	idleConnTimeout := orDefault(b.idleConnTimeout, 90*time.Second)
 	responseHeaderTimeout := orDefault(b.responseHeaderTimeout, 30*time.Second)
 	tlsHandshakeTimeout := orDefault(b.tlsHandshakeTimeout, 10*time.Second)
+	timeout := orDefault(b.timeout, 1*time.Minute)
 
 	base.DialContext = (&net.Dialer{
 		Timeout:   dialTimeout,
@@ -307,7 +308,7 @@ func (b *Builder) Build() (*http.Client, error) {
 	}
 
 	client := &http.Client{
-		Timeout:   b.timeout,
+		Timeout:   timeout,
 		Transport: rt,
 	}
 
